@@ -2,6 +2,7 @@
 ## Overview
 
 A simple set up for running RAG with images,different from tradition RAG which normally process text-only content. 
+Note: Currently, the repo works for IBM BAM only.
 
 ## Prerequisites
 
