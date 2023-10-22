@@ -28,7 +28,7 @@ services:
     ports:
       - "8015:8088"
     volumes:
-      - /Users/buckylee/Documents/github/rag-image/:/app/
+      - ./:/app/
       
     command: streamlit run /app/chat.py --server.port=8088
     healthcheck:
