@@ -84,11 +84,7 @@ repo_id = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 HUGGINGFACEHUB_API_TOKEN = os.environ.get("HUGGINGFACEHUB_API_TOKEN")
 
-client = chromadb.PersistentClient(path=os.environ.get("INDEX_NAME"))
 
-
-collection_name = st.sidebar.selectbox("Select the documents",
-        set([cols.name for cols in client.list_collections()]))
 
 use_history = st.sidebar.checkbox(label="use mermory")
 
@@ -110,19 +106,31 @@ if uploaded_file:
             persist_directory=INDEX_NAME
         )
     os.remove("/app/data/"+uploaded_file.name)
+    uploaded_file = ""
 
-if not os.path.exists(INDEX_NAME):
-    index = Chroma.from_documents(
+set_vectorstore = os.path.exists(INDEX_NAME)
+
+print("\n\n\n",INDEX_NAME,"is set ",set_vectorstore,"\n\n\n")
+if not set_vectorstore:
+    
+    vectorstore = Chroma.from_documents(
             documents=[],
             embedding=hf,
             persist_directory=INDEX_NAME
         )
-vectorstore = Chroma(
-                embedding_function=hf,
-                collection_name=collection_name,
-                persist_directory=INDEX_NAME
-            
-    )
+else:
+    collection_name = "langchain"
+    client = chromadb.PersistentClient(path=os.environ.get("INDEX_NAME"))
+    collection_name = st.sidebar.selectbox("Select the documents",
+        set([cols.name for cols in client.list_collections()]))
+    vectorstore = Chroma(
+                    embedding_function=hf,
+                    collection_name=collection_name,
+                    persist_directory=INDEX_NAME
+                
+        )
+
+
 
 
 def get_prompt_template(system_prompt=system_prompt, history=False):
@@ -261,6 +269,6 @@ if user_api_key:
             )
             qa_chain = retrieval_qa_pipline(vectorstore,True,llm,system_prompt)
             res = qa_chain(prompt,return_only_outputs=True)
-            print(res['answer'])
+            
         st.session_state.messages.append((prompt,res['answer']))
       

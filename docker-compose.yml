@@ -3,7 +3,7 @@ version: '3.5'
 services:
   
   minio:
-    container_name: milvus-minio
+    container_name: minio
     image: minio/minio:RELEASE.2023-03-20T20-16-18Z
     environment:
       MINIO_ACCESS_KEY: minioadmin
@@ -11,9 +11,9 @@ services:
     ports:
       - "9001:9001"
       - "9000:9000"
-    volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data
-    command: minio server /minio_data --console-address ":9001"
+    # volumes:
+    #   - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data
+    command:  minio server /minio_data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -28,8 +28,9 @@ services:
     ports:
       - "8015:8088"
     volumes:
-      - /root/chat-with-pdf-local:/app
-    command: streamlit run /app/chat.py --server.port=8088 ]
+      - /Users/buckylee/Documents/github/rag-image/:/app/
+      
+    command: streamlit run /app/chat.py --server.port=8088
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -39,4 +40,4 @@ services:
       - "minio"
 networks:
   default:
-    name: milvus
+    name: chat-demo

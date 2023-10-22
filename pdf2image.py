@@ -19,6 +19,7 @@ load_dotenv()
 
 BUCKET_NAME = os.getenv("BUCKET_NAME")
 MINIO_OBJECT_URL = os.environ.get("MINIO_OBJECT_URL")
+MINIO_PUBLIC_URL = os.environ.get("MINIO_PUBLIC_IP")
 HUGGINGFACEHUB_API_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 wx_model = os.getenv("WX_MODEL")
 INDEX_NAME = os.getenv("INDEX_NAME")
@@ -47,7 +48,7 @@ found = client.bucket_exists(BUCKET_NAME)
 if not found:
     client.make_bucket(BUCKET_NAME)
     policy = {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetBucketLocation","s3:ListBucket","s3:ListBucketMultipartUploads"],"Resource":["arn:aws:s3:::chat-demo"]},{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject","s3:ListMultipartUploadParts","s3:PutObject","s3:AbortMultipartUpload","s3:DeleteObject"],"Resource":["arn:aws:s3:::chat-demo/*"]}]}
-    client.set_bucket_policy(BUCKET_NAME, policy)
+    client.set_bucket_policy(BUCKET_NAME, json.dumps(policy))
 
 else:
     print(f"Bucket {BUCKET_NAME} already exists")
@@ -103,7 +104,7 @@ def extract_text_image(file):
             )
             os.remove(image_absoulte)
             # image_sources.append(image_src)
-            cos_url = os.path.join("http://",MINIO_OBJECT_URL,BUCKET_NAME, image_src)
+            cos_url = os.path.join("http://",MINIO_PUBLIC_URL,BUCKET_NAME, image_src)
             image_sources.append(cos_url)
         metadata = ({'image_source': json.dumps(image_sources,ensure_ascii=False), 'page':page_index+1})
         documents.append(Document(page_content=page.get_text().replace('\n',''),metadata=metadata))
