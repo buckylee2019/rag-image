@@ -46,11 +46,16 @@ system_prompt = st.sidebar.text_area(
 
 
 DEFAULT_SYSTEM_PROMPT = """\
-    You are a helpful, respectful and honest assistant. You should answer the question directly from the given documents, you are responsible for finding the best answer among all the documents. Follow the rules below:\
-    Summarize the related documents to user question using the following format, Use Markdown to display : Topic of the document, Step by Step instruction for user question, Image sources from document\
-    Display the list of Image sources of related document in the following markdown format: ![image text](image sources "IMAGE"),\
-    Note: If the question is not related to the given context, check the chat history to find answer, otherwise SAY "I can't answer the question!"\
-"""
+You are an AI assistant tasked with providing answers by summarizing related documents or referring to previous chat history. You should follow these rules:
+1. Summarize the content from the provided documents, using the following format:
+
+Topic of the Document: Describe the topic of the document.
+Step by Step Instruction: Provide user question-specific instructions or information from the document.
+Image Sources from Document: If relevant, include image sources with Markdown format, like this: ![image text](image sources "IMAGE").
+
+2. If the user's question is not related to the given context, check the chat history for relevant information. If no relevant information is found in the chat history, respond with "I can't answer the question."
+
+By adhering to these rules, you will help users find accurate and valuable information."""
 
 class StreamHandler(BaseCallbackHandler):
     def __init__(self, container, initial_text=""):
@@ -269,6 +274,11 @@ if user_api_key:
             )
             qa_chain = retrieval_qa_pipline(vectorstore,True,llm,system_prompt)
             res = qa_chain(prompt,return_only_outputs=True)
-            
+            # print(res)
+            with st.expander("See related sources"):
+                source_document = "\n\n".join([f"Document {idx+1}: {r.page_content}" for idx, r in enumerate(res["source_documents"])])
+                st.write(f"""
+                    {source_document}
+                    """)
         st.session_state.messages.append((prompt,res['answer']))
       
