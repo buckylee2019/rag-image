@@ -9,12 +9,20 @@ from dotenv import load_dotenv
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain.embeddings import HuggingFaceHubEmbeddings
 from langchain.vectorstores import Milvus
-import ibm_boto3
-from ibm_botocore.client import Config, ClientError
 from dotenv import load_dotenv
 from glob import glob
 from minio import Minio
 import io
+from langchain.text_splitter import CharacterTextSplitter
+
+text_splitter = CharacterTextSplitter(
+    separator = "。",
+    chunk_size = 200,
+    chunk_overlap  = 50,
+    length_function = len,
+    is_separator_regex = False,
+)
+
 load_dotenv()
 
 BUCKET_NAME = os.getenv("BUCKET_NAME")
@@ -106,8 +114,10 @@ def extract_text_image(file):
             # image_sources.append(image_src)
             cos_url = os.path.join("http://",MINIO_PUBLIC_URL,BUCKET_NAME, image_src)
             image_sources.append(cos_url)
-        metadata = ({'image_source': json.dumps(image_sources,ensure_ascii=False), 'page':page_index+1})
-        documents.append(Document(page_content=page.get_text().replace('\n',''),metadata=metadata))
+        text = page.get_text().replace('\n','')
+        metadata = {'image_source': json.dumps(image_sources,ensure_ascii=False), 'page':page_index+1}
+        docs = text_splitter.create_documents([text],metadatas=metadata)
+        documents.extend(docs)
 
     return documents
 # hf2 = HuggingFaceEmbeddings(model_name="GanymedeNil/text2vec-large-chinese")

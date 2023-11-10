@@ -25,8 +25,6 @@ load_dotenv()
 
 st.set_page_config(page_title="Chat with Documents", page_icon="💡")
 st.title("RAG")
-uploaded_file = st.file_uploader("Upload your PDF")
-
 
 PREFIX_PROMPT = "<s>[INST] <<SYS>>"
 # user_api_key = st.sidebar.text_input(
@@ -98,20 +96,25 @@ hf = HuggingFaceHubEmbeddings(
     repo_id = repo_id,
     huggingfacehub_api_token = HUGGINGFACEHUB_API_TOKEN,
 )
-if uploaded_file:
-    collection_name = uploaded_file.name.split('/')[-1].split('.')[0]
-    bytes_data = uploaded_file.getvalue()
-    with open("/app/data/"+uploaded_file.name,"wb") as f:
-        f.write(bytes_data)
-    document = extract_text_image("/app/data/"+uploaded_file.name)
-    index = Chroma.from_documents(
-            documents=document,
-            embedding=hf,
-            collection_name=collection_name,
-            persist_directory=INDEX_NAME
-        )
-    os.remove("/app/data/"+uploaded_file.name)
-    uploaded_file = ""
+with st.form("my-form", clear_on_submit=True):
+    uploaded_file = st.file_uploader("FILE UPLOADER")
+    submitted = st.form_submit_button("UPLOAD!")
+
+    if submitted and uploaded_file is not None:
+        st.write("UPLOADED!")
+        collection_name = uploaded_file.name.split('/')[-1].split('.')[0]
+        bytes_data = uploaded_file.getvalue()
+        with open("/app/data/"+uploaded_file.name,"wb") as f:
+            f.write(bytes_data)
+        document = extract_text_image("/app/data/"+uploaded_file.name)
+        index = Chroma.from_documents(
+                documents=document,
+                embedding=hf,
+                collection_name=collection_name,
+                persist_directory=INDEX_NAME
+            )
+        os.remove("/app/data/"+uploaded_file.name)
+        uploaded_file = None
 
 set_vectorstore = os.path.exists(INDEX_NAME)
 
