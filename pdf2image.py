@@ -17,7 +17,7 @@ from langchain.text_splitter import CharacterTextSplitter
 
 text_splitter = CharacterTextSplitter(
     separator = "。",
-    chunk_size = 200,
+    chunk_size = 300,
     chunk_overlap  = 50,
     length_function = len,
     is_separator_regex = False,
@@ -91,7 +91,7 @@ def extract_text_image(file):
             print("[!] No images found on page", page_index)
             # metadata = ({'image_source': "", 'page':page_index+1})
             # documents.append(Document(page_content=page.get_text(),metadata=metadata))
-        for image_index, img in enumerate(page.get_images(), start=1):
+        for image_index, img in enumerate(page.get_images(), start=0):
 
             # get the XREF of the image
             xref = img[0]
@@ -116,43 +116,12 @@ def extract_text_image(file):
             image_sources.append(cos_url)
         text = page.get_text().replace('\n','')
         metadata = {'image_source': json.dumps(image_sources,ensure_ascii=False), 'page':page_index+1}
-        docs = text_splitter.create_documents([text],metadatas=metadata)
+        splitted = len(text_splitter.split_text(text))
+        docs = text_splitter.create_documents([text],metadatas=[metadata for i in range(splitted)])
+        
         documents.extend(docs)
 
     return documents
-# hf2 = HuggingFaceEmbeddings(model_name="GanymedeNil/text2vec-large-chinese")
 
-# index = Chroma.from_documents(
-#         documents=documents,
-#         embedding=hf,
-#         collection_name=INDEX_NAME,
-#         persist_directory=INDEX_NAME
-#     )
-
-INDEXED = True
-for pdf in glob(PDF_DIR+"*.pdf"):
-    collection_name = pdf.split('/')[-1].split('.')[0]
-    if not INDEXED:
-        documents = extract_text_image(file = pdf)
-
-        index = Chroma.from_documents(
-                documents=documents,
-                embedding=hf,
-                collection_name=collection_name,
-                persist_directory=INDEX_NAME
-            )
-    else:
-        index = Chroma(
-                embedding_function=hf,
-                collection_name=collection_name,
-                persist_directory=INDEX_NAME
-            )
-    # index = Chroma(
-    #         embedding_function=hf,
-    #         collection_name=INDEX_NAME,
-    #         persist_directory=INDEX_NAME
-    #     )
-    result = index.similarity_search("What tools do I need to remove aileron control bellcrank in the wing?")
-    print(result)
 
 
