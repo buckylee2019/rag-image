@@ -2,7 +2,9 @@
 ## Overview
 
 A simple set up for running RAG with images,different from tradition RAG which normally process text-only content. 
-Note: Currently, the repo works for IBM BAM only.
+For IBM internal development, feel free to use BAM as an alternative, for pilot case please use watsonx, in case you suffered from SDK transition.
+
+Warning: Streaming method in ibm machine learning has issue displaying Chinese, hence in watsonx mode, result will be showed only when generation is completed.
 
 ## Prerequisites
 
@@ -15,7 +17,10 @@ Before running the script, ensure you have the following prerequisites:
 
 1. Clone the repository or download the script to your local machine.
 
-2. Create a `.env` file from `.env_template`:
+2. Create a `.env` file from `.env_template`
+
+3. To use watsonx, please make sure set the USE_WATSONX to True, and fill out the API Key and Project ID.
+
 
 ## Usage
 

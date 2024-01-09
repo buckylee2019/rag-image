@@ -20,8 +20,18 @@ from langchain.vectorstores import Chroma
 from dotenv import load_dotenv
 import chromadb
 from pdf2image import extract_text_image
+import logging
+from ibm_watson_machine_learning.metanames import GenTextParamsMetaNames as GenParams
+from ibm_watson_machine_learning.foundation_models.utils.enums import DecodingMethods
+from ibm_watson_machine_learning.foundation_models import Model
+from ibm_watson_machine_learning.foundation_models.utils.enums import ModelTypes
+
+
+
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Chat with Documents", page_icon="💡")
 st.title("RAG")
@@ -33,6 +43,40 @@ PREFIX_PROMPT = "<s>[INST] <<SYS>>"
 #     type="password")
 user_api_key = os.environ.get("BAM_API_KEY")
 INDEX_NAME = os.environ.get("INDEX_NAME")
+USE_WATSONX = os.environ.get("USE_WATSONX", 'False').lower() in ('true', '1', 't')
+if USE_WATSONX:
+    WX_MODEL = os.environ.get("WX_MODEL")
+    api_key = os.getenv("API_KEY", None)
+    ibm_cloud_url = os.getenv("IBM_CLOUD_URL", None)
+    project_id = os.getenv("PROJECT_ID", None)
+    if api_key is None or ibm_cloud_url is None or project_id is None:
+        print("Ensure you copied the .env file that you created earlier into the same directory as this notebook")
+    else:
+        creds = {
+            "url": ibm_cloud_url,
+            "apikey": api_key 
+        }
+    params = {
+            GenParams.DECODING_METHOD: DecodingMethods.GREEDY,
+            GenParams.MIN_NEW_TOKENS: 1,
+            GenParams.MAX_NEW_TOKENS: 1024,
+            GenParams.TEMPERATURE: 0,
+            GenParams.REPETITION_PENALTY: 1
+        }
+else:
+    params = GenerateParams(
+        decoding_method="greedy",
+        max_new_tokens=1024,
+        min_new_tokens=1,
+        stream=True,
+        top_k=50,
+        top_p=1,
+    )
+
+    WX_MODEL = os.environ.get("WX_MODEL")
+    creds = Credentials(user_api_key, "https://bam-api.res.ibm.com/v1")
+
+
 system_prompt = st.sidebar.text_area(
     label="System prompt for model",
     placeholder= """\
@@ -68,19 +112,7 @@ class StreamHandler(BaseCallbackHandler):
         return super().on_llm_end(response, run_id=run_id, parent_run_id=parent_run_id, **kwargs)
     
 
-params = GenerateParams(
-        decoding_method="greedy",
-        max_new_tokens=1024,
-        min_new_tokens=1,
-        stream=True,
-        top_k=50,
-        top_p=1,
-    )
 
-
-
-WX_MODEL = os.environ.get("WX_MODEL")
-creds = Credentials(user_api_key, "https://bam-api.res.ibm.com/v1")
 
 repo_id = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
@@ -211,6 +243,9 @@ def retrieval_qa_pipline(db, use_history, llm, system_prompt):
     # load the llm pipeline
 
     if use_history:
+        
+        # prompt.format(summaries="California", question="Sacramento",memory=memory)
+
         qa = RetrievalQAWithSourcesChain.from_chain_type(
             llm=llm,
             chain_type="stuff",  # try other chains types as well. refine, map_reduce, map_rerank
@@ -219,6 +254,7 @@ def retrieval_qa_pipline(db, use_history, llm, system_prompt):
             chain_type_kwargs={"prompt":prompt,
                 "document_prompt":doc_promt, "memory": memory},
         )
+        
     else:
         qa = RetrievalQAWithSourcesChain.from_chain_type(
             llm=llm,
@@ -269,14 +305,29 @@ if user_api_key:
             stream_handler = StreamHandler(message_placeholder)
 
             # message_placeholder            
-            llm = LangChainInterface(
+            logger.warning("Using WATSONX is %s ",USE_WATSONX)
+            if USE_WATSONX:
+                _, rag_prompt, _ = get_prompt_template( system_prompt=system_prompt,history=use_history)
+                docs = vectorstore.similarity_search(prompt,k=3)
+                source_document = "\n\n".join([f"\nDocument: {r.page_content}\n\tImage sources: {r.metadata['image_source']}" for idx, r in enumerate(docs)])
+                res = {"answer": ""}
+                llm  = Model(model_id=WX_MODEL, credentials=creds, params=params,
+                    project_id=project_id)
+                res['answer'] = llm.generate_text(prompt=rag_prompt.format(summaries=source_document,question=prompt))
+
+                st.markdown(res['answer'])
+                res['source_documents'] = docs
+
+                
+            else:
+                llm = LangChainInterface(
                 model=WX_MODEL,
                 credentials=creds,
                 params=params,
                 callbacks=[stream_handler]
             )
-            qa_chain = retrieval_qa_pipline(vectorstore,True,llm,system_prompt)
-            res = qa_chain(prompt,return_only_outputs=True)
+                qa_chain = retrieval_qa_pipline(vectorstore,True,llm,system_prompt)
+                res = qa_chain(prompt,return_only_outputs=True)
             # print(res)
             with st.expander("See related sources"):
                 source_document = "\n\n".join([f"Document {idx+1}: {r.page_content}" for idx, r in enumerate(res["source_documents"])])
