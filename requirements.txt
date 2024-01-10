@@ -7,7 +7,7 @@ ibm-generative-ai==0.2.8
 numpy
 toml==0.10.2
 pymysql
-ibm-watson-machine-learning==1.0.312
+ibm-watson-machine-learning==1.0.339
 huggingface_hub
 unstructured
 streamlit
