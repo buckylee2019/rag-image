@@ -41,7 +41,7 @@ PREFIX_PROMPT = "<s>[INST] <<SYS>>"
 #     label="#### Your Bam API key 👇",
 #     placeholder="Paste your Bam API key, pak-",
 #     type="password")
-user_api_key = os.environ.get("BAM_API_KEY")
+user_api_key = os.environ.get("GENAI_KEY")
 INDEX_NAME = os.environ.get("INDEX_NAME")
 USE_WATSONX = os.environ.get("USE_WATSONX", 'False').lower() in ('true', '1', 't')
 if USE_WATSONX:
@@ -109,6 +109,7 @@ class StreamHandler(BaseCallbackHandler):
             self.text += token
             self.container.markdown(self.text)
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, parent_run_id: UUID | None = None, **kwargs: Any) -> Any:
+        
         return super().on_llm_end(response, run_id=run_id, parent_run_id=parent_run_id, **kwargs)
     
 
@@ -272,6 +273,18 @@ clear_conversation = st.sidebar.button(
     label="Clear conversation"
 )
 
+if 'continued' not in st.session_state:
+    st.session_state.continued = ""
+
+def continue_generate(llm,text):
+    if text!= "":
+        generated_text = llm(text)
+        st.session_state.continued = text + generated_text
+        user_input, answer = st.session_state.messages[-1] 
+        st.session_state.messages[-1] = (user_input,answer+generated_text)
+        st.session_state.continued = ""
+    else:
+        st.session_state.continued = text
 
 if not system_prompt:
     system_prompt = DEFAULT_SYSTEM_PROMPT
@@ -292,6 +305,7 @@ if user_api_key:
         with st.chat_message("user"):
             st.markdown(user_input)
         with st.chat_message("assistant"):
+            
             st.markdown(response)
 
     if prompt := st.chat_input("Ask your question.."):
@@ -303,20 +317,27 @@ if user_api_key:
             
             message_placeholder = st.empty()
             stream_handler = StreamHandler(message_placeholder)
-
+            
             # message_placeholder            
             logger.warning("Using WATSONX is %s ",USE_WATSONX)
+            _, rag_prompt, _ = get_prompt_template( system_prompt=system_prompt,history=use_history)
             if USE_WATSONX:
                 _, rag_prompt, _ = get_prompt_template( system_prompt=system_prompt,history=use_history)
                 docs = vectorstore.similarity_search(prompt,k=3)
                 source_document = "\n\n".join([f"\nDocument: {r.page_content}\n\tImage sources: {r.metadata['image_source']}" for idx, r in enumerate(docs)])
                 res = {"answer": ""}
                 llm  = Model(model_id=WX_MODEL, credentials=creds, params=params,
-                    project_id=project_id)
-                res['answer'] = llm.generate_text(prompt=rag_prompt.format(summaries=source_document,question=prompt))
+                    project_id=project_id).to_langchain()
+                full_prompt =rag_prompt.format(summaries=source_document,question=prompt)
+                res['answer'] = llm(full_prompt)
 
                 st.markdown(res['answer'])
+                
                 res['source_documents'] = docs
+                if st.session_state.continued == "":
+                    st.button('Continue Generation', on_click=continue_generate, args=[llm,full_prompt+res['answer']])
+                
+                st.session_state.messages.append((prompt,res['answer']))
 
                 
             else:
@@ -327,12 +348,21 @@ if user_api_key:
                 callbacks=[stream_handler]
             )
                 qa_chain = retrieval_qa_pipline(vectorstore,True,llm,system_prompt)
-                res = qa_chain(prompt,return_only_outputs=True)
+                res = qa_chain(prompt,return_only_outputs=True,include_run_info=True)
+                
+                # st.markdown(res['answer'])
+                source_document = "\n\n".join([f"Document {idx+1}: {r.page_content}" for idx, r in enumerate(res["source_documents"])])
+                full_prompt =rag_prompt.format(summaries=source_document,question=prompt)
+                if st.session_state.continued == "":
+                    st.button('Continue Generation', on_click=continue_generate, args=[llm,full_prompt+stream_handler.text])
+                
+                st.session_state.messages.append((prompt,stream_handler.text))
             # print(res)
             with st.expander("See related sources"):
-                source_document = "\n\n".join([f"Document {idx+1}: {r.page_content}" for idx, r in enumerate(res["source_documents"])])
+                
                 st.write(f"""
                     {source_document}
                     """)
-        st.session_state.messages.append((prompt,res['answer']))
+            
+            
       

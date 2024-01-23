@@ -14,10 +14,10 @@ from glob import glob
 from minio import Minio
 import io
 from langchain.text_splitter import CharacterTextSplitter
-
+import logging
 text_splitter = CharacterTextSplitter(
     separator = "。",
-    chunk_size = 300,
+    chunk_size = 400,
     chunk_overlap  = 50,
     length_function = len,
     is_separator_regex = False,
@@ -91,6 +91,12 @@ def extract_text_image(file):
             print("[!] No images found on page", page_index)
             # metadata = ({'image_source': "", 'page':page_index+1})
             # documents.append(Document(page_content=page.get_text(),metadata=metadata))
+        try:
+            tabs = page.find_tables()
+        except:
+            tabs = []
+        for i, table in enumerate(tabs):
+            logging.warning(table.extract())
         for image_index, img in enumerate(page.get_images(), start=0):
 
             # get the XREF of the image
@@ -114,7 +120,7 @@ def extract_text_image(file):
             # image_sources.append(image_src)
             cos_url = os.path.join("http://",MINIO_PUBLIC_URL,BUCKET_NAME, image_src)
             image_sources.append(cos_url)
-        text = page.get_text().replace('\n','')
+        text = page.get_text().replace('\n\n','')
         metadata = {'image_source': json.dumps(image_sources,ensure_ascii=False), 'page':page_index+1}
         splitted = len(text_splitter.split_text(text))
         docs = text_splitter.create_documents([text],metadatas=[metadata for i in range(splitted)])

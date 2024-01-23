@@ -5,3 +5,6 @@ chroma*
 data/.DS_Store
 .DS_Store
 PDFwithImage/d1f1d567-0219-4780-be77-ae0a8fe35c67/index_metadata.pickle
+chat_tbm.py
+*.pdf
+.venv/*
