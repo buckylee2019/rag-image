@@ -18,3 +18,4 @@ pypandoc==1.11
 pymupdf
 chromadb==0.4.14
 minio
+transformers
